@@ -14,3 +14,19 @@ def load_data(path):
         return df_train, df_test
     else:
         return None, None
+
+def load_embedding(path):
+    if path is not None:
+        glove_embedding = np.load(path, allow_pickle=True)
+        return glove_embedding
+    else:
+        return None
+
+
+def load_embedding(path):
+    if path is not None:
+        glove_embedding = np.load(path, allow_pickle=True)
+        return glove_embedding
+    else:
+        return None
+
