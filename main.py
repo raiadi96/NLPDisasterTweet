@@ -5,6 +5,7 @@ EMBEDDING_PATH = 'Embeddings/glove.840B.300d.pkl'
 import load_data
 import preprocess
 from data_plot import plot_keywords_distribution
+import tensorflow_hub
 
 df_train, df_test = load_data.load_data(DATA_PATH)
 print('Training Set Shape = {}'.format(df_train.shape))
@@ -48,6 +49,9 @@ test_vocab_coverage = preprocess.check_embeddings_coverage(df_test['text_cleaned
 
 print("Vocabulary Coverage in Training before preprocessing is {:.2f}%".format(train_vocab_coverage * 100))
 print("Vocabulary Coverage in Testing before preprocessing is {:.2f}%".format(test_vocab_coverage * 100))
+
+bert = tensorflow_hub.KerasLayer('https://tfhub.dev/tensorflow/bert_en_uncased_L-12_H-768_A-12/1'\
+                              , trainable=True)
 
 
 
