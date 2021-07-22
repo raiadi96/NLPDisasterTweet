@@ -37,6 +37,19 @@ test_vocab_coverage = preprocess.check_embeddings_coverage(df_test['text'], embe
 print("Vocabulary Coverage in Training before preprocessing is {:.2f}%".format(train_vocab_coverage * 100))
 print("Vocabulary Coverage in Testing before preprocessing is {:.2f}%".format(test_vocab_coverage * 100))
 
+df_train['text_cleaned'] = df_train['text'].apply(\
+    lambda s : preprocess.clean(s))
+df_test['text_cleaned'] = df_test['text'].apply(\
+    lambda s : preprocess.clean(s))
+
+
+train_vocab_coverage = preprocess.check_embeddings_coverage(df_train['text_cleaned'], embeddings= embedding)
+test_vocab_coverage = preprocess.check_embeddings_coverage(df_test['text_cleaned'], embeddings=embedding)
+
+print("Vocabulary Coverage in Training before preprocessing is {:.2f}%".format(train_vocab_coverage * 100))
+print("Vocabulary Coverage in Testing before preprocessing is {:.2f}%".format(test_vocab_coverage * 100))
+
+
 
 
 
