@@ -1,5 +1,12 @@
 import tensorflow_hub
 from bert import tokenization
+import  numpy as np
+import tensorflow as tf
+from sklearn.model_selection import StratifiedKFold
+import pandas as pd
+import ClassificationReportModel as ClassificationReport
+import matplotlib.pyplot as plt
+import seaborn as sns
 
 class DisasterDetector:
 
@@ -18,6 +25,130 @@ class DisasterDetector:
 
         self.models = []
         self.scores = {}
+        K = 2
+        self.skf = StratifiedKFold(n_splits=K, random_state=43, shuffle=True)
 
     def encode(self, texts):
-        pass
+        all_tokens = []
+        all_masks = []
+        all_segments = []
+        for text in texts:
+            text = self.tokenizer.tokenize(text)
+            text = text[:self.max_sequence_length - 2]
+            input_sequences = ['[CLS]'] + text + ['[SEP]']
+            pad_len = self.max_sequence_length - len(input_sequences)
+            tokens = self.tokenizer.convert_tokens_to_ids(input_sequences)
+            tokens += [0] * self.max_sequence_length
+            pad_masks = [1] * len(input_sequences) + [0] * pad_len
+            segment_ids = [0] * self.max_sequence_length
+            all_tokens.append(tokens)
+            all_masks.append(pad_masks)
+            all_segments.append(segment_ids)
+        return np.array(all_tokens), np.array(all_masks), np.array(all_segments)
+
+    def build_model(self):
+
+        input_word_ids = tf.keras.Input(shape=(self.max_sequence_length), dtype = tf.int32, name = 'Input Word Ids')
+        input_masks = tf.keras.Input(shape= (self.max_sequence_length), dtype = tf.int32, name = 'input_mask')
+        segment_ids = tf.keras.Input(shape=(self.max_sequence_length,), dtype=tf.int32, name='segment_ids')
+
+        pooled_output, sequence_output = self.bert_layer([input_word_ids, input_masks, segment_ids])
+
+        clf_output = sequence_output[:, 0, :]
+        out = tf.keras.layers.Dense(1, activation='sigmoid')(clf_output)
+
+        model = tf.keras.Model(inputs = [input_word_ids, input_masks, segment_ids], outputs = [out])
+        optimizer = tf.keras.optimizers.SGD(learning_rate=self.lr, momentum=0.8)
+        model.compile(loss='binary_crossentropy', optimizer = optimizer, metrics= ['accuracy'])
+
+        return model
+
+    def train(self, X: pd.DataFrame):
+
+
+        for fold, (train_Idx, val_Idx) in enumerate(self.skf.split(X['text_cleaned'], X['keyword'])):
+
+            print("\n Fold {} \n",format(fold))
+
+            X_trn_encoded = self.encode(X.loc[train_Idx, 'text_cleaned'].str.lower())
+            y_trn = X.loc[train_Idx, 'target']
+            # X_trn_encoded = np.asarray(X_trn_encoded)
+            # y_trn = np.asarray(y_trn)
+
+            X_val_encoded = self.encode(X.loc[val_Idx, 'text_cleaned'].str.lower())
+            y_val = X.loc[val_Idx, 'target']
+            # X_val_encoded = np.asarray
+
+            metrics = ClassificationReport.ClassificationReport(train_data=(X_trn_encoded, y_trn), validation_data=(X_val_encoded, y_val))
+
+            # Model
+            model = self.build_model()
+            model.fit(X_trn_encoded, y_trn, validation_data=(X_val_encoded, y_val), callbacks=[metrics],
+                      epochs=self.epochs, batch_size=self.batch_size)
+
+            self.models.append(model)
+            self.scores[fold] = {
+                'train': {
+                    'precision': metrics.train_precision_scores,
+                    'recall': metrics.train_recall_scores,
+                    'f1': metrics.train_f1_scores
+                },
+                'validation': {
+                    'precision': metrics.val_precision_scores,
+                    'recall': metrics.val_recall_scores,
+                    'f1': metrics.val_f1_scores
+                }
+            }
+
+        def plot_learning_curve(self):
+
+            fig, axes = plt.subplots(nrows=self.K, ncols=2, figsize=(20, K * 6), dpi=100)
+
+            for i in range(self.K):
+
+                # Classification Report curve
+                sns.lineplot(x=np.arange(1, self.epochs + 1), y=self.clf.models[i].history.history['val_accuracy'],
+                             ax=axes[i][0], label='val_accuracy')
+                sns.lineplot(x=np.arange(1, self.epochs + 1), y=self.clf.scores[i]['validation']['precision'], ax=axes[i][0],
+                             label='val_precision')
+                sns.lineplot(x=np.arange(1, self.epochs + 1), y= self.clf.scores[i]['validation']['recall'], ax=axes[i][0],
+                             label='val_recall')
+                sns.lineplot(x=np.arange(1, self.epochs + 1), y= self.clf.scores[i]['validation']['f1'], ax=axes[i][0],
+                             label='val_f1')
+
+                axes[i][0].legend()
+                axes[i][0].set_title('Fold {} Validation Classification Report'.format(i), fontsize=14)
+
+                # Loss curve
+                sns.lineplot(x=np.arange(1, self.epochs + 1), y= self.clf.models[0].history.history['loss'], ax=axes[i][1],
+                             label='train_loss')
+                sns.lineplot(x=np.arange(1, self.epochs + 1), y= self.clf.models[0].history.history['val_loss'],
+                             ax=axes[i][1], label='val_loss')
+
+                axes[i][1].legend()
+                axes[i][1].set_title('Fold {} Train / Validation Loss'.format(i), fontsize=14)
+
+                for j in range(2):
+                    axes[i][j].set_xlabel('Epoch', size=12)
+                    axes[i][j].tick_params(axis='x', labelsize=12)
+                    axes[i][j].tick_params(axis='y', labelsize=12)
+
+            plt.show()
+
+        def predict(self, X):
+
+            X_test_encoded = self.encode(X['text_cleaned'].str.lower())
+            y_pred = np.zeros((X_test_encoded[0].shape[0], 1))
+
+            for model in self.models:
+                y_pred += model.predict(X_test_encoded) / len(self.models)
+
+            return y_pred
+
+
+
+
+
+
+
+

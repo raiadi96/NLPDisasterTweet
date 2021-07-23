@@ -6,6 +6,9 @@ import load_data
 import preprocess
 from data_plot import plot_keywords_distribution
 import tensorflow_hub
+import BertModel as bm
+
+
 
 df_train, df_test = load_data.load_data(DATA_PATH)
 print('Training Set Shape = {}'.format(df_train.shape))
@@ -53,6 +56,9 @@ print("Vocabulary Coverage in Testing before preprocessing is {:.2f}%".format(te
 bert = tensorflow_hub.KerasLayer('https://tfhub.dev/tensorflow/bert_en_uncased_L-12_H-768_A-12/1'\
                               , trainable=True)
 
+clf = bm.DisasterDetector(bert, max_sequence_length= 128, lr= 0.0001, batch_size= 32)
+
+clf.train(df_train)
 
 
 
