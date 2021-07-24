@@ -19,7 +19,7 @@ class ClassificationReport(Callback):
         self.val_f1_scores = []
 
     def on_epoch_end(self, epoch, logs=None):
-        train_predictions = np.round(self.model_predict(self.X_train, verbose = 0))
+        train_predictions = np.round(self.model.predict(self.X_train, verbose = 0))
         train_precision = precision_score(self.y_train, train_predictions)
         train_recall = recall_score(self.y_train, train_predictions)
         train_f1 = f1_score(self.y_train, train_predictions, average='macro')
